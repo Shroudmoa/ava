@@ -137,7 +137,7 @@ pub fn run(sheet: &Sheet) -> i32 {
         names: sheet.names(),
     }));
 
-    let hist = dirs::home_dir().map(|h| h.join(".ava_history"));
+    let hist = crate::config::Config::history_path().map(|h| h.with_file_name("history"));
     if let Some(h) = &hist {
         let _ = rl.load_history(h);
     }

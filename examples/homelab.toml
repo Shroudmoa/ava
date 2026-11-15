@@ -1,0 +1,25 @@
+# ava example sheet: homelab
+
+[[cmd]]
+name = "nas"
+desc = "SSH into the NAS"
+kind = "shell"
+run = "ssh admin@nas.local"
+
+[[cmd]]
+name = "server"
+desc = "SSH into the home server"
+kind = "shell"
+run = "ssh admin@my-server.local"
+
+[[cmd]]
+name = "vpn"
+desc = "Bring up the wireguard tunnel"
+kind = "shell"
+run = "sudo wg-quick up home"
+
+[[cmd]]
+name = "wiki"
+desc = "Open the internal wiki"
+kind = "shell"
+run = "xdg-open http://wiki.local"

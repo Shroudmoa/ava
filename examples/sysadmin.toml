@@ -1,0 +1,25 @@
+# ava example sheet: sysadmin essentials
+
+[[cmd]]
+name = "services"
+desc = "List running systemd services"
+kind = "shell"
+run = "systemctl list-units --type=service --state=running"
+
+[[cmd]]
+name = "failed"
+desc = "Show failed systemd units"
+kind = "shell"
+run = "systemctl --failed"
+
+[[cmd]]
+name = "cron"
+desc = "Show the user crontab"
+kind = "shell"
+run = "crontab -l"
+
+[[cmd]]
+name = "reboot-hint"
+desc = "How to reboot this box"
+kind = "shell"
+run = "echo sudo reboot"

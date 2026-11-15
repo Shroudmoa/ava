@@ -3,6 +3,7 @@
 
 mod banner;
 mod cmds;
+mod config;
 mod dash;
 mod repl;
 mod sheet;

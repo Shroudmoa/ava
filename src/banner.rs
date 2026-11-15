@@ -91,9 +91,24 @@ pub fn help(sheet: &Sheet) {
         println!();
     }
     println!();
+    println!("  {}commands: {}{}", DIM, sheet.cmds.len(), RESET);
+    println!("  {}loaded sheets:", DIM);
+    for s in sheet.user_sheets() {
+        println!("    {}{}", GREEN, s.name);
+        println!("      {} - {}", DIM, s.path.display());
+        if s.entries == 1 {
+            println!("      1 command");
+        } else {
+            println!("      {} commands", s.entries);
+        }
+    }
     println!(
-        "  {}user sheet: ~/.ava/sheet.toml (add or shadow commands, no rebuild){}",
-        DIM, RESET
+        "  {}config: {}{}",
+        DIM,
+        crate::config::Config::path()
+            .map(|p| p.display().to_string())
+            .unwrap_or_else(|| "(default)".into()),
+        RESET
     );
     println!(
         "  {}unknown input is passed to your shell (like mova){}",

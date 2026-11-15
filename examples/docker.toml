@@ -1,0 +1,31 @@
+# ava example sheet: docker
+
+[[cmd]]
+name = "docker-ps"
+desc = "Running containers"
+kind = "shell"
+run = "docker ps"
+
+[[cmd]]
+name = "docker-images"
+desc = "Downloaded images"
+kind = "shell"
+run = "docker images"
+
+[[cmd]]
+name = "docker-logs"
+desc = "Follow logs of a container"
+kind = "shell"
+run = "docker logs -f"
+
+[[cmd]]
+name = "docker-compose-up"
+desc = "Start a compose stack"
+kind = "shell"
+run = "docker compose up -d"
+
+[[cmd]]
+name = "docker-compose-down"
+desc = "Stop a compose stack"
+kind = "shell"
+run = "docker compose down"

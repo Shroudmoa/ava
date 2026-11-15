@@ -1,6 +1,7 @@
 // builtins + dispatch: one registry, one dispatch fn - grow mova style
 
 use crate::banner;
+use crate::sheet::Kind;
 use crate::sheet::Sheet;
 use std::io::Write;
 use std::process::Command;
@@ -39,11 +40,14 @@ pub fn dispatch(line: &str, sheet: &Sheet) -> Outcome {
     let arg = parts.next().unwrap_or("").trim();
 
     if let Some(entry) = sheet.find(head) {
-        if entry.kind == "builtin" {
+        if entry.kind == Kind::Builtin {
             match builtin(&entry.run) {
                 Some(f) => return f(arg, sheet),
                 None => {
-                    eprintln!("{}ava: builtin '{}' not compiled in.{}", RED, entry.run, RESET);
+                    eprintln!(
+                        "{}ava: builtin '{}' ({}) not compiled in.{}",
+                        RED, entry.run, entry.kind.as_str(), RESET
+                    );
                     return Outcome::Done(1);
                 }
             }
@@ -70,6 +74,28 @@ pub fn run_shell(cmd: &str) -> Outcome {
             Outcome::Done(1)
         }
     }
+}
+
+/// mask secret values before anything is written to the log
+pub fn redact(line: &str) -> String {
+    const SECRET_KEYS: [&str; 8] = [
+        "password", "passwd", "secret", "token", "credential", "apikey", "auth", "private",
+    ];
+    let mut out = String::with_capacity(line.len());
+    for token in line.split_whitespace() {
+        let (key, value) = match token.split_once('=') {
+            Some(kv) => kv,
+            None => (token, ""),
+        };
+        let clean = key.trim_start_matches("export ").to_ascii_lowercase();
+        if !value.is_empty() && SECRET_KEYS.iter().any(|k| clean.contains(k)) {
+            out.push_str("****");
+        } else {
+            out.push_str(token);
+        }
+        out.push(' ');
+    }
+    out.trim().to_string()
 }
 
 // ---------------- builtins ----------------
@@ -280,7 +306,7 @@ pub fn log(entry: &str) {
     let path = if cfg!(windows) {
         dirs::data_local_dir().map(|d| d.join("ava").join("ava.log"))
     } else {
-        dirs::home_dir().map(|h| h.join(".ava.log"))
+        dirs::config_dir().map(|d| d.join("ava")).map(|d| d.join("ava.log"))
     };
     if let Some(p) = path {
         if let Some(dir) = p.parent() {
@@ -293,8 +319,26 @@ pub fn log(entry: &str) {
                 ts,
                 banner::user(),
                 banner::hostname(),
-                entry
+                redact(entry)
             );
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn redact_masks_secret_assignments() {
+        assert_eq!(redact("export API_TOKEN=abc123"), "export ****");
+        assert_eq!(redact("mysql -u root -psecret123"), "mysql -u root -psecret123");
+        assert_eq!(redact("FOO=bar"), "FOO=bar");
+    }
+
+    #[test]
+    fn redact_keeps_normal_lines() {
+        assert_eq!(redact("EXECUTE: ls -la"), "EXECUTE: ls -la");
+        assert_eq!(redact(""), "");
     }
 }

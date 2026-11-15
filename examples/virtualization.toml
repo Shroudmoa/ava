@@ -1,0 +1,19 @@
+# ava example sheet: virtualization
+
+[[cmd]]
+name = "vms"
+desc = "List libvirt virtual machines"
+kind = "shell"
+run = "virsh list --all"
+
+[[cmd]]
+name = "vm-start"
+desc = "Start a virtual machine"
+kind = "shell"
+run = "virsh start"
+
+[[cmd]]
+name = "vm-stop"
+desc = "Stop a virtual machine"
+kind = "shell"
+run = "virsh shutdown"

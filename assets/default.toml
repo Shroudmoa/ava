@@ -1,5 +1,5 @@
-# ava default sheet
-# copy entries into ~/.ava/sheet.toml to add or shadow commands - no rebuild needed
+# ava default sheet - embedded builtin commands
+# user sheets (see ~/.config/ava/sheets/) are merged on top, later sheets override
 
 [[cmd]]
 name = "0"

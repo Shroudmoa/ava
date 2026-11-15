@@ -1,0 +1,20 @@
+# ava example sheets
+# copy the ones you need into ~/.config/ava/sheets/ (or /your/sheet/dir) and reload
+
+[[cmd]]
+name = "disk"
+desc = "Disk usage (df -h)"
+kind = "shell"
+run = "df -h"
+
+[[cmd]]
+name = "update"
+desc = "Package updates (apt)"
+kind = "shell"
+run = "sudo apt update && sudo apt upgrade -y"
+
+[[cmd]]
+name = "reboot"
+desc = "Reboot the machine"
+kind = "shell"
+run = "sudo reboot"

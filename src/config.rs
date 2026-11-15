@@ -1,0 +1,202 @@
+// configuration: platform-standard config directory
+// linux:   ~/.config/ava/
+// windows: %APPDATA%\ava\
+// the file is optional - defaults kick in when it is missing or invalid
+
+use serde::Deserialize;
+use std::path::{Path, PathBuf};
+
+const APP_DIR: &str = "ava";
+const CONFIG_FILE: &str = "config.toml";
+
+#[derive(Debug, Clone, Default)]
+pub struct Config {
+    pub sheets: Sheets,
+    pub interface: Interface,
+    pub history: History,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct Sheets {
+    /// directories scanned for *.toml command sheets, in load order
+    pub directories: Vec<PathBuf>,
+    /// explicit sheet files, in load order
+    pub files: Vec<PathBuf>,
+}
+
+#[derive(Debug, Clone)]
+pub struct Interface {
+    pub color: bool,
+    pub dashboard: bool,
+}
+
+impl Default for Interface {
+    fn default() -> Self {
+        Interface {
+            color: true,
+            dashboard: true,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct History {
+    pub enabled: bool,
+}
+
+impl Default for History {
+    fn default() -> Self {
+        History { enabled: true }
+    }
+}
+
+#[derive(Debug, Deserialize, Default)]
+struct RawConfig {
+    #[serde(default)]
+    sheets: RawSheets,
+    #[serde(default)]
+    interface: RawInterface,
+    #[serde(default)]
+    history: RawHistory,
+}
+
+#[derive(Debug, Deserialize, Default)]
+struct RawSheets {
+    #[serde(default)]
+    directories: Vec<String>,
+    #[serde(default)]
+    files: Vec<String>,
+}
+
+#[derive(Debug, Deserialize, Default)]
+struct RawInterface {
+    #[serde(default = "bool_true")]
+    color: bool,
+    #[serde(default = "bool_true")]
+    dashboard: bool,
+}
+
+#[derive(Debug, Deserialize, Default)]
+struct RawHistory {
+    #[serde(default = "bool_true")]
+    enabled: bool,
+}
+
+fn bool_true() -> bool {
+    true
+}
+
+impl Config {
+    /// load the user configuration, falling back to defaults when absent/invalid
+    pub fn load() -> Config {
+        let path = Config::path();
+        let mut config = Config::default();
+
+        if let Some(p) = &path {
+            if let Ok(text) = std::fs::read_to_string(p) {
+                match toml::from_str::<RawConfig>(&text) {
+                    Ok(raw) => config = Config::from_raw(raw, &p),
+                    Err(e) => eprintln!(
+                        "ava: config parse error at {}: {} - using defaults",
+                        p.display(),
+                        e
+                    ),
+                }
+            }
+        }
+
+        if config.sheets.directories.is_empty() {
+            if let Some(dir) = Config::config_dir() {
+                config.sheets.directories.push(dir.join("sheets"));
+            }
+        }
+        config
+    }
+
+    /// pure builder so the merge of defaults + file content stays testable
+    fn from_raw(raw: RawConfig, path: &Path) -> Config {
+        let base = path.parent().unwrap_or_else(|| Path::new(".")).to_path_buf();
+        let mut config = Config::default();
+        config.sheets.directories = raw
+            .sheets
+            .directories
+            .iter()
+            .map(|d| resolve(&base, d))
+            .collect();
+        config.sheets.files = raw
+            .sheets
+            .files
+            .iter()
+            .map(|f| resolve(&base, f))
+            .collect();
+        config.interface.color = raw.interface.color;
+        config.interface.dashboard = raw.interface.dashboard;
+        config.history.enabled = raw.history.enabled;
+        if config.sheets.directories.is_empty() {
+            if let Some(dir) = Config::config_dir() {
+                config.sheets.directories.push(dir.join("sheets"));
+            }
+        }
+        config
+    }
+
+    /// ~/.config/ava/config.toml on linux, %APPDATA%\ava\config.toml on windows
+    pub fn path() -> Option<PathBuf> {
+        let dir = dirs::config_dir()?.join(APP_DIR);
+        Some(dir.join(CONFIG_FILE))
+    }
+
+    pub fn config_dir() -> Option<PathBuf> {
+        dirs::config_dir().map(|d| d.join(APP_DIR))
+    }
+
+    pub fn history_path() -> Option<PathBuf> {
+        dirs::config_dir()
+            .map(|d| d.join(APP_DIR))
+            .map(|d| d.join("history"))
+    }
+}
+
+fn resolve(base: &Path, p: &str) -> PathBuf {
+    let p = PathBuf::from(p);
+    if p.is_absolute() {
+        p
+    } else {
+        base.join(p)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn defaults_are_sensible() {
+        let c = Config::default();
+        assert!(c.interface.color);
+        assert!(c.interface.dashboard);
+        assert!(c.history.enabled);
+        assert!(c.sheets.directories.is_empty());
+    }
+
+    #[test]
+    fn raw_config_builds_expected_values() {
+        let raw = RawConfig {
+            sheets: RawSheets {
+                directories: vec!["sheets".into()],
+                files: vec![],
+            },
+            interface: RawInterface {
+                color: false,
+                dashboard: false,
+            },
+            history: RawHistory { enabled: false },
+        };
+        let c = Config::from_raw(raw, Path::new("/tmp/ava/config.toml"));
+        assert!(!c.interface.color);
+        assert!(!c.interface.dashboard);
+        assert!(!c.history.enabled);
+        // relative sheet dirs resolve against the config dir
+        assert_eq!(c.sheets.directories[0], PathBuf::from("/tmp/ava/sheets"));
+    }
+}

@@ -1,0 +1,25 @@
+# ava example sheet: network diagnostics
+
+[[cmd]]
+name = "ping"
+desc = "Ping a host (8.8.8.8)"
+kind = "shell"
+run = "ping -c 4 8.8.8.8"
+
+[[cmd]]
+name = "traceroute"
+desc = "Trace route to a host"
+kind = "shell"
+run = "traceroute 8.8.8.8"
+
+[[cmd]]
+name = "dns"
+desc = "Query public DNS for a name"
+kind = "shell"
+run = "dig +short @8.8.8.8 example.com"
+
+[[cmd]]
+name = "speedtest"
+desc = "Run a speed test"
+kind = "shell"
+run = "curl -s --max-time 20 https://speed.hetzner.de/1000MB.bin -o /dev/null -w '%{speed_download}' | xargs echo"
