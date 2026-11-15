@@ -1,0 +1,67 @@
+# ava default sheet
+# copy entries into ~/.ava/sheet.toml to add or shadow commands - no rebuild needed
+
+[[cmd]]
+name = "0"
+desc = "Simple system info (uptime, load, RAM)"
+kind = "builtin"
+run = "sysinfo"
+
+[[cmd]]
+name = "2"
+desc = "Network info (ip addr + ip route)"
+kind = "builtin"
+run = "net"
+
+[[cmd]]
+name = "ports"
+desc = "Show listening TCP ports"
+kind = "builtin"
+run = "ports"
+
+[[cmd]]
+name = "d"
+desc = "Live status dashboard"
+kind = "builtin"
+run = "dash"
+
+[[cmd]]
+name = "999"
+desc = "Show this command overview / help"
+kind = "builtin"
+run = "help"
+
+[[cmd]]
+name = "c"
+desc = "Clear the screen"
+kind = "builtin"
+run = "clear"
+
+[[cmd]]
+name = "e"
+desc = "Exit ava"
+kind = "builtin"
+run = "exit"
+
+# --- shell examples (edit freely) ---
+
+[[cmd]]
+name = "10"
+desc = "Open myvision portal"
+kind = "shell"
+run  = "xdg-open https://myvision.framer.website/ >/dev/null 2>&1"
+win  = "start https://myvision.framer.website/"
+
+[[cmd]]
+name = "11"
+desc = "Open visionmaxx.net/kontakt"
+kind = "shell"
+run  = "xdg-open https://visionmaxx.net/kontakt/ >/dev/null 2>&1"
+win  = "start https://visionmaxx.net/kontakt/"
+
+[[cmd]]
+name = "publicip"
+desc = "Show public IP"
+kind = "shell"
+run  = "curl -s --max-time 5 https://api.ipify.org && echo"
+win  = "powershell -NoProfile -Command (Invoke-RestMethod https://api.ipify.org)"
