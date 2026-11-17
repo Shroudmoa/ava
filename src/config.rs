@@ -14,6 +14,7 @@ pub struct Config {
     pub sheets: Sheets,
     pub interface: Interface,
     pub history: History,
+    pub shell: Option<String>,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -58,6 +59,14 @@ struct RawConfig {
     interface: RawInterface,
     #[serde(default)]
     history: RawHistory,
+    #[serde(default)]
+    shell: RawShell,
+}
+
+#[derive(Debug, Clone, Default, Deserialize)]
+struct RawShell {
+    #[serde(default)]
+    name: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Default)]
@@ -132,6 +141,7 @@ impl Config {
         config.interface.color = raw.interface.color;
         config.interface.dashboard = raw.interface.dashboard;
         config.history.enabled = raw.history.enabled;
+        config.shell = raw.shell.name;
         if config.sheets.directories.is_empty() {
             if let Some(dir) = Config::config_dir() {
                 config.sheets.directories.push(dir.join("sheets"));
@@ -154,6 +164,12 @@ impl Config {
         dirs::config_dir()
             .map(|d| d.join(APP_DIR))
             .map(|d| d.join("history"))
+    }
+
+    /// the shell shell-commands run through inside the dash terminals
+    /// (sh/bash/fish, from `[shell] name` in the config) - None = default `sh`
+    pub fn shell(&self) -> Option<&str> {
+        self.shell.as_deref()
     }
 }
 
@@ -191,11 +207,15 @@ mod tests {
                 dashboard: false,
             },
             history: RawHistory { enabled: false },
+            shell: RawShell {
+                name: Some("fish".into()),
+            },
         };
         let c = Config::from_raw(raw, Path::new("/tmp/ava/config.toml"));
         assert!(!c.interface.color);
         assert!(!c.interface.dashboard);
         assert!(!c.history.enabled);
+        assert_eq!(c.shell.as_deref(), Some("fish"));
         // relative sheet dirs resolve against the config dir
         assert_eq!(c.sheets.directories[0], PathBuf::from("/tmp/ava/sheets"));
     }

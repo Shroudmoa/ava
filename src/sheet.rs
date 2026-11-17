@@ -121,6 +121,21 @@ impl Sheet {
         self.cmds.iter().map(|c| c.name.clone()).collect()
     }
 
+    /// filter commands by name or description substring, case-insensitive;
+    /// empty query = the full list
+    pub fn filter(&self, query: &str) -> Vec<&CmdEntry> {
+        let q = query.trim().to_lowercase();
+        if q.is_empty() {
+            return self.cmds.iter().collect();
+        }
+        self.cmds
+            .iter()
+            .filter(|c| {
+                c.name.to_lowercase().contains(&q) || c.desc.to_lowercase().contains(&q)
+            })
+            .collect()
+    }
+
     pub fn user_sheets(&self) -> &[LoadedSheet] {
         &self.loaded
     }
@@ -265,5 +280,51 @@ mod tests {
         let e = f.cmd.into_iter().next().unwrap();
         assert_eq!(e.kind, Kind::Shell);
         assert_eq!(e.run, "echo hi");
+    }
+
+    fn sheet_with(cmds: Vec<CmdEntry>) -> Sheet {
+        Sheet {
+            cmds,
+            loaded: vec![],
+        }
+    }
+
+    #[test]
+    fn filter_empty_query_returns_all() {
+        let s = sheet_with(vec![
+            entry("ports", Kind::Shell, "ss"),
+            entry("publicip", Kind::Shell, "curl"),
+        ]);
+        assert_eq!(s.filter("").len(), 2);
+        assert_eq!(s.filter("   ").len(), 2);
+    }
+
+    #[test]
+    fn filter_matches_name_case_insensitive() {
+        let s = sheet_with(vec![
+            entry("publicip", Kind::Shell, "curl"),
+            entry("ports", Kind::Shell, "ss"),
+        ]);
+        assert_eq!(s.filter("PUBLICIP").len(), 1);
+        assert_eq!(s.filter("pub").len(), 1);
+    }
+
+    #[test]
+    fn filter_matches_description_substring() {
+        let s = sheet_with(vec![CmdEntry {
+            name: "sysinfo".into(),
+            desc: "Simple system info (uptime, load, RAM)".into(),
+            kind: Kind::Builtin,
+            run: "sysinfo".into(),
+            win: None,
+        }]);
+        assert_eq!(s.filter("uptime").len(), 1);
+        assert_eq!(s.filter("network").len(), 0);
+    }
+
+    #[test]
+    fn filter_no_match_is_empty() {
+        let s = sheet_with(vec![entry("ports", Kind::Shell, "ss")]);
+        assert!(s.filter("zzzz").is_empty());
     }
 }

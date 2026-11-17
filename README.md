@@ -35,7 +35,7 @@ ava::ti-gw@root ~/ViS › _
 | `0` | system info — OS, kernel, uptime, load, RAM with bar (green/yellow/red) |
 | `2` | network info — `ip addr` + `ip route` (windows: `ipconfig /all` + `route print`) |
 | `ports` | listening TCP sockets straight from `/proc/net/tcp` (windows: `netstat -ano`) |
-| `d` | live status dashboard (ratatui: header + command list + ports, refreshing) |
+| `d` | live status dashboard (ratatui: header + command list + terminal, refreshing) |
 | `999` | command overview |
 | `c` | clear screen |
 | `e` | exit |
@@ -89,11 +89,23 @@ $ ava --version
 
 press `d` (or `ava d`):
 
-- **header** — uptime, load, RAM gauge — refreshes every second
-- **left** — the command sheet, `↑↓`/`jk` to move, `enter` to run
-- **right** — live listening ports
-- `q`/`esc` back to the shell prompt, `enter` inside a run suspends the tui,
-  shows the output, and returns when you press enter
+- **header** — uptime, load, RAM gauge — refreshes continuously
+- **commands** — the command sheet, smaller now, `↑↓`/`jk` to move, `enter` to run
+- **one little terminal** — a real interactive shell in a pseudo-terminal, right
+  under the list. `ctrl+t` focuses it (spawning the shell on first use); it keeps
+  its own cwd, env, exports and history, and ANSI output (colors, prompts,
+  cursor movement) is emulated inside the pane. ava does not interpret what you
+  type — keystrokes go straight to the shell as raw bytes.
+- **`/` search** — type to filter the list live (name + description, case
+  insensitive), `↑↓`/`jk` move through the matches, `enter` runs the top hit,
+  `esc` clears the search
+- **jump list ⇄ terminal** — `ctrl+t` toggles between the command list and the
+  terminal view. `tab` is **not** a dashboard keybinding — in the terminal it is
+  passed through to the shell for normal tab-completion.
+- selecting a `kind = "shell"` command types it into the live terminal;
+  ava builtins suspend the tui, run, then return.
+- `q` (in the list) exits; `esc` returns from the terminal to the list (and closes
+  the shell session). `exit`/`ctrl-d` end the shell itself.
 
 ## the usual mova glue
 
@@ -128,6 +140,9 @@ dashboard = true
 
 [history]
 enabled = true
+
+[shell]
+name = "bash"      # shell for the dashboard terminal: sh | bash | fish | zsh
 ```
 
 - `[sheets] directories` — directories scanned for `*.toml` command sheets
@@ -136,6 +151,18 @@ enabled = true
 - `[sheets] files` — explicit sheet files to load.
 - `[interface] color` / `dashboard` — toggles.
 - `[history] enabled` — history on/off.
+- `[shell] name` — the independent shell spawned inside the dashboard terminal
+  (`bash` by default). any installed shell works: `fish`, `bash`, `zsh`, `sh`.
+
+  ```toml
+  [shell]
+  name = "fish"   # or "bash" / "zsh" / "sh"
+  ```
+
+  the dashboard terminal is a real PTY session of that shell — not an exec
+  wrapper and not ava's own dispatch. builtins (sysinfo, ports, dash, ...) are
+  ava's own and always run as ava. ava's ordinary unknown-command fallback shell
+  is separate and unchanged.
 
 a missing or invalid `config.toml` never breaks ava: defaults are used and a
 warning is printed.

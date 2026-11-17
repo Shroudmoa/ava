@@ -62,18 +62,34 @@ pub fn dispatch(line: &str, sheet: &Sheet) -> Outcome {
 }
 
 pub fn run_shell(cmd: &str) -> Outcome {
-    let (prog, flag) = if cfg!(windows) {
-        ("cmd", "/C")
-    } else {
-        ("sh", "-c")
-    };
-    match Command::new(prog).arg(flag).arg(cmd).status() {
-        Ok(status) => Outcome::Done(status.code().unwrap_or(1)),
+    let (code, stdout, stderr) = run_shell_with(&shell_default(), cmd);
+    print!("{}", stdout);
+    if !stderr.is_empty() {
+        print!("{}", stderr);
+    }
+    let _ = std::io::stdout().flush();
+    Outcome::Done(code)
+}
+
+/// run a shell line with the given shell (`sh`, `bash`, `fish, ...`) and capture
+/// stdout+stderr, so callers (the dash's little terminal) can show what ran
+pub fn run_shell_with(shell: &str, cmd: &str) -> (i32, String, String) {
+    let flag = if cfg!(windows) { "/C" } else { "-c" };
+    match Command::new(shell).arg(flag).arg(cmd).output() {
+        Ok(out) => (
+            out.status.code().unwrap_or(1),
+            String::from_utf8_lossy(&out.stdout).to_string(),
+            String::from_utf8_lossy(&out.stderr).to_string(),
+        ),
         Err(e) => {
             eprintln!("{}shell error: {}{}", RED, e, RESET);
-            Outcome::Done(1)
+            (1, String::new(), String::new())
         }
     }
+}
+
+fn shell_default() -> &'static str {
+    if cfg!(windows) { "cmd" } else { "sh" }
 }
 
 /// mask secret values before anything is written to the log
@@ -174,7 +190,11 @@ fn ports_cmd(_arg: &str, _sheet: &Sheet) -> Outcome {
 }
 
 fn dash_cmd(_arg: &str, sheet: &Sheet) -> Outcome {
-    crate::dash::run(sheet)
+    let shell = crate::config::Config::load()
+        .shell()
+        .map(|s| s.to_string())
+        .unwrap_or_else(|| "bash".into());
+    crate::dash::run(sheet, &shell)
 }
 
 fn help_cmd(_arg: &str, sheet: &Sheet) -> Outcome {
