@@ -1,0 +1,21 @@
+# tmux: persistent sessions that live inside ava's dashboard terminal.
+# best used from the dashboard (press d, select "tmux", enter) - the command
+# is typed into the live shell pane, so the tmux session keeps its own state.
+
+[[cmd]]
+name = "tmux"
+desc = "Attach to (or create) the 'ava' tmux session"
+kind = "shell"
+run = "tmux new-session -A -s ava"
+
+[[cmd]]
+name = "tmux-ls"
+desc = "List tmux sessions"
+kind = "shell"
+run = "tmux list-sessions"
+
+[[cmd]]
+name = "tmux-kill"
+desc = "Kill the tmux server (all sessions)"
+kind = "shell"
+run = "tmux kill-server"

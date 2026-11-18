@@ -34,7 +34,7 @@ ava::ti-gw@root ~/ViS › _
 |------|--------------|
 | `0` | system info — OS, kernel, uptime, load, RAM with bar (green/yellow/red) |
 | `2` | network info — `ip addr` + `ip route` (windows: `ipconfig /all` + `route print`) |
-| `ports` | listening TCP sockets straight from `/proc/net/tcp` (windows: `netstat -ano`) |
+| `ports` | listening TCP sockets from `/proc/net/tcp{,6}` with decoded IPv4/IPv6 addresses (windows: `netstat -ano`) |
 | `d` | live status dashboard (ratatui: header + command list + terminal, refreshing) |
 | `999` | command overview |
 | `c` | clear screen |
@@ -80,22 +80,37 @@ every command also works from a script or another shell:
 ```console
 $ ava ports            # run once, print, exit
 $ ava publicip         # 185.194.66.74
+$ ava echo "a  b"      # a  b  (argv is re-quoted, spacing survives)
 $ ava 0 && echo ok     # exit code of the command is preserved
 $ ava --help           # cheat sheet without starting the repl
 $ ava --version
 ```
 
+one-shot mode prints only the command's output — no "trying shell..." notice.
+the exit code of the command is preserved.
+
 ## dashboard
 
 press `d` (or `ava d`):
 
-- **header** — uptime, load, RAM gauge — refreshes continuously
-- **commands** — the command sheet, smaller now, `↑↓`/`jk` to move, `enter` to run
+- **header** — two live panels: host/uptime/load/RAM gauge and
+  CPU/disk/network-rates/process count. heavy stats refresh once a second.
+- **commands** — the command sheet, `↑↓`/`jk` to move, `pgup`/`pgdn` by page,
+  `enter` to run
 - **one little terminal** — a real interactive shell in a pseudo-terminal, right
   under the list. `ctrl+t` focuses it (spawning the shell on first use); it keeps
   its own cwd, env, exports and history, and ANSI output (colors, prompts,
-  cursor movement) is emulated inside the pane. ava does not interpret what you
-  type — keystrokes go straight to the shell as raw bytes.
+  cursor movement) is emulated inside the pane. the pty is resized to the exact
+  pane size: focused, it uses the whole body instead of the narrow list-view
+  pane. ava does not interpret what you type — keystrokes go straight to the
+  shell as raw bytes.
+- **scrolling** — mouse wheel over the pane, or `alt+↑`/`alt+↓` (page:
+  `alt+pgup`/`alt+pgdn`, `alt+home`/`alt+end`) browses 5000 lines of scrollback.
+  typing or clicking follows the prompt again. plain `pgup`/`pgdn` still go to
+  the shell, so tmux and `less` keep their own bindings.
+- **mouse-aware programs** — when the shell asks for mouse reporting (tmux, vim,
+  less, ...) clicks and the wheel are forwarded in its preferred encoding;
+  otherwise the wheel scrolls ava's view. see `examples/tmux.toml`.
 - **`/` search** — type to filter the list live (name + description, case
   insensitive), `↑↓`/`jk` move through the matches, `enter` runs the top hit,
   `esc` clears the search
@@ -104,8 +119,10 @@ press `d` (or `ava d`):
   passed through to the shell for normal tab-completion.
 - selecting a `kind = "shell"` command types it into the live terminal;
   ava builtins suspend the tui, run, then return.
-- `q` (in the list) exits; `esc` returns from the terminal to the list (and closes
-  the shell session). `exit`/`ctrl-d` end the shell itself.
+- `q` (in the list) exits; `esc` returns from the terminal to the list (the shell
+  keeps running in the background); `exit`/`ctrl-d` end the shell itself.
+- the dashboard needs an interactive terminal: from a pipe or script it prints a
+  clear error and exits with code 1 instead of crashing.
 
 ## the usual mova glue
 
@@ -149,8 +166,11 @@ name = "bash"      # shell for the dashboard terminal: sh | bash | fish | zsh
   (default: `~/.config/ava/sheets`). relative paths resolve against the config
   dir.
 - `[sheets] files` — explicit sheet files to load.
-- `[interface] color` / `dashboard` — toggles.
-- `[history] enabled` — history on/off.
+- `[interface] color` — when `false`, ANSI colors are stripped from the banner,
+  help, prompt, sysinfo and dashboard (plain text everywhere).
+- `[interface] dashboard` — when `false`, the `d` command refuses to start and
+  explains why; all other commands are unaffected.
+- `[history] enabled` — when `false`, history is neither read, appended nor saved.
 - `[shell] name` — the independent shell spawned inside the dashboard terminal
   (`bash` by default). any installed shell works: `fish`, `bash`, `zsh`, `sh`.
 
@@ -165,7 +185,9 @@ name = "bash"      # shell for the dashboard terminal: sh | bash | fish | zsh
   is separate and unchanged.
 
 a missing or invalid `config.toml` never breaks ava: defaults are used and a
-warning is printed.
+warning is printed (including when the file exists but cannot be read). the
+config is read once at startup and shared by every subsystem, so sheets,
+colors, history and the dashboard always agree.
 
 ## multiple sheets, one command set
 
@@ -193,6 +215,7 @@ examples/
 ├── docker.toml
 ├── virtualization.toml
 ├── sysadmin.toml
+├── tmux.toml
 └── homelab.toml
 ```
 
@@ -240,7 +263,10 @@ there.
   whole point of the design, there is no sandbox to escape.
 - never run sheets from people you don't trust: they execute shell commands.
 - no automatic remote execution, no automatic updates.
-- logs and history mask secrets (`TOKEN=...`, `PASSWORD=...`) before writing.
+- logs and history mask secrets before writing: `TOKEN=...`, `PASSWORD=...`,
+  `--token value`, `Bearer value` and `Authorization: Bearer value`. single-dash
+  flags (`-psecret`) are left alone so normal commands stay readable.
+- the log rotates to `ava.log.1` once it passes 1 MiB.
 
 ## build
 
@@ -248,6 +274,7 @@ there.
 cd ava
 cargo build --release
 ./target/release/ava
+cargo test          # unit tests + end-to-end CLI tests in tests/cli.rs
 ```
 
 windows arm is written against `netstat -ano`, `ipconfig /all`, `route print`
@@ -266,6 +293,7 @@ ava/
     ├── config.rs         # platform config dir, defaults, optional config.toml
     ├── sheet.rs          # load + merge builtin and user sheets
     ├── cmds.rs           # builtins + dispatch + logging
+    ├── color.rs          # global color switch from config
     ├── repl.rs           # rustyline: history, completion, hints
     ├── dash.rs           # ratatui live dashboard
     └── banner.rs         # banner + help

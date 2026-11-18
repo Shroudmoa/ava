@@ -63,9 +63,7 @@ pub struct Sheet {
 impl Sheet {
     /// builtin defaults + every user sheet; broken sheets warn and are skipped,
     /// the rest of the configuration still works
-    pub fn load() -> Sheet {
-        let config = Config::load();
-
+    pub fn load(config: &Config) -> Sheet {
         let mut sources: Vec<Vec<CmdEntry>> = Vec::new();
         let mut loaded: Vec<LoadedSheet> = Vec::new();
 

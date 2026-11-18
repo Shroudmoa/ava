@@ -63,6 +63,21 @@ $ ava cron
 
 external dependencies: `systemctl`, `crontab`.
 
+## tmux
+
+persistent sessions inside the dashboard's live terminal.
+
+```console
+$ ava d          # then select "tmux" and press enter
+$ ava tmux-ls
+```
+
+mouse clicks and the wheel are forwarded to tmux when it asks for mouse
+reporting, so pane resizing and copy mode work normally. `alt+↑↓` scrolls
+ava's own view instead.
+
+external dependencies: `tmux`.
+
 ## homelab
 
 ssh targets and personal infrastructure.

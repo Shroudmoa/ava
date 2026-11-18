@@ -1,6 +1,7 @@
 // banner + help - the mova first impression
 
-use crate::cmds::{bar, color_for, CYAN, DARKRED, DIM, GREEN, MAGENTA, RESET};
+use crate::cmds::{bar, color_for, format_uptime, to_gb, CYAN, DARKRED, DIM, GREEN, MAGENTA, RESET};
+use crate::color;
 use crate::sheet::Sheet;
 use sysinfo::System;
 
@@ -52,50 +53,74 @@ pub fn banner() {
 
     let info = [
         format!("{}@{}", user(), hostname()),
-        format!("Uptime : {}d {}h {}m", up / 86400, (up % 86400) / 3600, (up % 3600) / 60),
+        format!("Uptime : {}", format_uptime(up)),
         format!("Load   : {:.2} {:.2} {:.2}", load.one, load.five, load.fifteen),
-        format!("RAM    : {}/{} GB {} {}%", to_gb(used), to_gb(total), bar(pct, 10), pct),
+        format!(
+            "RAM    : {}/{} GB {} {}%",
+            to_gb(used),
+            to_gb(total),
+            bar(pct, 10),
+            pct
+        ),
     ];
     let info_colors = [CYAN, DIM, DIM, color_for(pct)];
 
     println!();
-    for i in 0..art.len() {
-        print!("{}{}", DIM, art[i]);
-        let pad = 17 - art[i].chars().count();
+    for (i, line) in art.iter().enumerate() {
+        print!("{}{}", color::seq(DIM), line);
+        let pad = 17 - line.chars().count();
         print!("{}", " ".repeat(pad));
         if i < info.len() {
-            println!("{}{}", info_colors[i], info[i]);
-        } else if i == art.len() - 1 {
-            println!("{}", RESET);
+            println!("{}{}", color::seq(info_colors[i]), info[i]);
         } else {
-            println!("{}", RESET);
+            println!("{}", color::seq(RESET));
         }
     }
     println!(
         "{}type {}999{} for commands · {}d{} dashboard · {}e{} exit{}\n",
-        DIM, CYAN, DIM, MAGENTA, DIM, MAGENTA, DIM, RESET
+        color::seq(DIM),
+        color::seq(CYAN),
+        color::seq(DIM),
+        color::seq(MAGENTA),
+        color::seq(DIM),
+        color::seq(MAGENTA),
+        color::seq(DIM),
+        color::seq(RESET)
     );
 }
 
 pub fn help(sheet: &Sheet) {
     println!();
-    println!("  {}ava{} :: command overview", DARKRED, RESET);
-    println!("  {}-----------------------{}", DIM, RESET);
+    println!(
+        "  {}ava{} :: command overview",
+        color::seq(DARKRED),
+        color::seq(RESET)
+    );
+    println!(
+        "  {}-----------------------{}",
+        color::seq(DIM),
+        color::seq(RESET)
+    );
     for entry in &sheet.cmds {
         let col = if entry.name.starts_with(|c: char| c.is_ascii_digit()) {
             CYAN
         } else {
             GREEN
         };
-        print!("  {}{:<10} {}{}", col, entry.name, RESET, entry.desc);
-        println!();
+        println!(
+            "  {}{:<10} {}{}",
+            color::seq(col),
+            entry.name,
+            color::seq(RESET),
+            entry.desc
+        );
     }
     println!();
-    println!("  {}commands: {}{}", DIM, sheet.cmds.len(), RESET);
-    println!("  {}loaded sheets:", DIM);
+    println!("  {}commands: {}{}", color::seq(DIM), sheet.cmds.len(), color::seq(RESET));
+    println!("  {}loaded sheets:", color::seq(DIM));
     for s in sheet.user_sheets() {
-        println!("    {}{}", GREEN, s.name);
-        println!("      {} - {}", DIM, s.path.display());
+        println!("    {}{}", color::seq(GREEN), s.name);
+        println!("      {} - {}", color::seq(DIM), s.path.display());
         if s.entries == 1 {
             println!("      1 command");
         } else {
@@ -104,19 +129,16 @@ pub fn help(sheet: &Sheet) {
     }
     println!(
         "  {}config: {}{}",
-        DIM,
+        color::seq(DIM),
         crate::config::Config::path()
             .map(|p| p.display().to_string())
             .unwrap_or_else(|| "(default)".into()),
-        RESET
+        color::seq(RESET)
     );
     println!(
         "  {}unknown input is passed to your shell (like mova){}",
-        DIM, RESET
+        color::seq(DIM),
+        color::seq(RESET)
     );
     println!();
-}
-
-fn to_gb(bytes: u64) -> String {
-    format!("{:.1}", bytes as f64 / 1024.0 / 1024.0 / 1024.0)
 }

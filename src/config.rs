@@ -77,7 +77,7 @@ struct RawSheets {
     files: Vec<String>,
 }
 
-#[derive(Debug, Deserialize, Default)]
+#[derive(Debug, Deserialize)]
 struct RawInterface {
     #[serde(default = "bool_true")]
     color: bool,
@@ -85,10 +85,26 @@ struct RawInterface {
     dashboard: bool,
 }
 
-#[derive(Debug, Deserialize, Default)]
+// derived Default would silently turn features off when config.toml is absent
+impl Default for RawInterface {
+    fn default() -> Self {
+        RawInterface {
+            color: true,
+            dashboard: true,
+        }
+    }
+}
+
+#[derive(Debug, Deserialize)]
 struct RawHistory {
     #[serde(default = "bool_true")]
     enabled: bool,
+}
+
+impl Default for RawHistory {
+    fn default() -> Self {
+        RawHistory { enabled: true }
+    }
 }
 
 fn bool_true() -> bool {
@@ -99,21 +115,33 @@ impl Config {
     /// load the user configuration, falling back to defaults when absent/invalid
     pub fn load() -> Config {
         let path = Config::path();
-        let mut config = Config::default();
-
-        if let Some(p) = &path {
-            if let Ok(text) = std::fs::read_to_string(p) {
-                match toml::from_str::<RawConfig>(&text) {
-                    Ok(raw) => config = Config::from_raw(raw, &p),
-                    Err(e) => eprintln!(
-                        "ava: config parse error at {}: {} - using defaults",
+        let raw = path
+            .as_ref()
+            .and_then(|p| match std::fs::read_to_string(p) {
+                Ok(text) => match toml::from_str::<RawConfig>(&text) {
+                    Ok(raw) => Some(raw),
+                    Err(e) => {
+                        eprintln!(
+                            "ava: config parse error at {}: {} - using defaults",
+                            p.display(),
+                            e
+                        );
+                        None
+                    }
+                },
+                Err(e) if p.exists() => {
+                    eprintln!(
+                        "ava: cannot read config at {}: {} - using defaults",
                         p.display(),
                         e
-                    ),
+                    );
+                    None
                 }
-            }
-        }
+                Err(_) => None, // no config file at all is a normal, supported case
+            })
+            .unwrap_or_default();
 
+        let mut config = Config::from_raw(raw, path.as_deref().unwrap_or(Path::new(".")));
         if config.sheets.directories.is_empty() {
             if let Some(dir) = Config::config_dir() {
                 config.sheets.directories.push(dir.join("sheets"));
@@ -142,11 +170,6 @@ impl Config {
         config.interface.dashboard = raw.interface.dashboard;
         config.history.enabled = raw.history.enabled;
         config.shell = raw.shell.name;
-        if config.sheets.directories.is_empty() {
-            if let Some(dir) = Config::config_dir() {
-                config.sheets.directories.push(dir.join("sheets"));
-            }
-        }
         config
     }
 
@@ -218,5 +241,20 @@ mod tests {
         assert_eq!(c.shell.as_deref(), Some("fish"));
         // relative sheet dirs resolve against the config dir
         assert_eq!(c.sheets.directories[0], PathBuf::from("/tmp/ava/sheets"));
+    }
+
+    #[test]
+    fn raw_defaults_keep_features_on() {
+        let raw = RawConfig::default();
+        assert!(raw.interface.color);
+        assert!(raw.interface.dashboard);
+        assert!(raw.history.enabled);
+    }
+
+    #[test]
+    fn from_raw_stays_pure() {
+        let c = Config::from_raw(RawConfig::default(), Path::new("/tmp/ava/config.toml"));
+        assert!(c.sheets.directories.is_empty());
+        assert!(c.sheets.files.is_empty());
     }
 }

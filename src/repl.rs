@@ -1,13 +1,15 @@
 // repl: rustyline edition - history, tab completion, inline hints
 
 use crate::cmds::{self, Outcome};
+use crate::color;
+use crate::config::Config as AvaConfig;
 use crate::sheet::Sheet;
 use rustyline::completion::{Completer, Pair};
 use rustyline::error::ReadlineError;
-use rustyline::hint::{Hinter, Hint};
+use rustyline::hint::{Hint, Hinter};
 use rustyline::highlight::Highlighter;
 use rustyline::validate::Validator;
-use rustyline::{Config, Context, Editor, Helper};
+use rustyline::{ColorMode, Config, Context, Editor, Helper};
 use std::borrow::Cow;
 
 struct AvaHelper {
@@ -75,7 +77,12 @@ impl Hinter for AvaHelper {
 
 impl Highlighter for AvaHelper {
     fn highlight_hint<'h>(&self, hint: &'h str) -> Cow<'h, str> {
-        Cow::Owned(format!("\x1b[90m{}\x1b[0m", hint))
+        Cow::Owned(format!(
+            "{}{}{}",
+            color::seq("\x1b[90m"),
+            hint,
+            color::seq("\x1b[0m")
+        ))
     }
 }
 
@@ -97,6 +104,7 @@ impl rustyline::Prompt for AvaPrompt {
 }
 
 fn prompt() -> AvaPrompt {
+    let s = color::seq;
     let user = crate::banner::user();
     let host = crate::banner::hostname();
     let dir = crate::banner::cwd();
@@ -104,13 +112,13 @@ fn prompt() -> AvaPrompt {
         raw: format!("ava::{}@{} {} › ", host, user, dir),
         styled: format!(
             "{dr}ava{r}{d}::{r}{c}{host}{r}{d}@{r}{b}{user}{r}{y} {dir}{r}{m} ›{r} ",
-            dr = crate::cmds::DARKRED,
-            r = crate::cmds::RESET,
-            d = crate::cmds::DIM,
-            c = crate::cmds::CYAN,
-            b = crate::cmds::BLUE,
-            y = crate::cmds::YELLOW,
-            m = crate::cmds::MAGENTA,
+            dr = s(crate::cmds::DARKRED),
+            r = s(crate::cmds::RESET),
+            d = s(crate::cmds::DIM),
+            c = s(crate::cmds::CYAN),
+            b = s(crate::cmds::BLUE),
+            y = s(crate::cmds::YELLOW),
+            m = s(crate::cmds::MAGENTA),
             host = host,
             user = user,
             dir = dir,
@@ -118,15 +126,18 @@ fn prompt() -> AvaPrompt {
     }
 }
 
-pub fn run(sheet: &Sheet) -> i32 {
-    let config = Config::builder()
+pub fn run(sheet: &Sheet, config: &AvaConfig) -> i32 {
+    let builder = Config::builder()
         .completion_type(rustyline::CompletionType::List)
-        .color_mode(rustyline::ColorMode::Enabled)
-        .auto_add_history(true)
-        .build();
+        .auto_add_history(config.history.enabled);
+    let builder = if config.interface.color {
+        builder.color_mode(ColorMode::Enabled)
+    } else {
+        builder.color_mode(ColorMode::Disabled)
+    };
 
     let mut rl: Editor<AvaHelper, rustyline::history::DefaultHistory> =
-        match Editor::with_config(config) {
+        match Editor::with_config(builder.build()) {
             Ok(e) => e,
             Err(e) => {
                 eprintln!("ava: readline init failed: {}", e);
@@ -137,7 +148,12 @@ pub fn run(sheet: &Sheet) -> i32 {
         names: sheet.names(),
     }));
 
-    let hist = crate::config::Config::history_path().map(|h| h.with_file_name("history"));
+    // [history] enabled = false means no read, no write, no inline additions
+    let hist = if config.history.enabled {
+        crate::config::Config::history_path()
+    } else {
+        None
+    };
     if let Some(h) = &hist {
         let _ = rl.load_history(h);
     }
@@ -150,7 +166,7 @@ pub fn run(sheet: &Sheet) -> i32 {
                 if line.is_empty() {
                     continue;
                 }
-                match cmds::dispatch(&line, sheet) {
+                match cmds::dispatch(&line, sheet, config, true) {
                     Outcome::Done(_) => {}
                     Outcome::Exit(c) => {
                         code = c;
@@ -180,5 +196,5 @@ pub fn run(sheet: &Sheet) -> i32 {
 
 fn log_exit() {
     cmds::log("EXIT");
-    println!("{}bye.{}", crate::cmds::DIM, crate::cmds::RESET);
+    println!("{}bye.{}", color::seq(crate::cmds::DIM), color::seq(crate::cmds::RESET));
 }
