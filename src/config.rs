@@ -15,6 +15,25 @@ pub struct Config {
     pub interface: Interface,
     pub history: History,
     pub shell: Option<String>,
+    pub mags: Mags,
+}
+
+/// where `mag` pulls command configs from: a GitHub repo with a mags.toml index
+#[derive(Debug, Clone)]
+pub struct Mags {
+    pub repo: String,
+    pub branch: String,
+    pub path: String,
+}
+
+impl Default for Mags {
+    fn default() -> Self {
+        Mags {
+            repo: "Shroudmoa/ava".into(),
+            branch: "main".into(),
+            path: "examples".into(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Default)]
@@ -61,6 +80,40 @@ struct RawConfig {
     history: RawHistory,
     #[serde(default)]
     shell: RawShell,
+    #[serde(default)]
+    mags: RawMags,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+struct RawMags {
+    #[serde(default = "default_mag_repo")]
+    repo: String,
+    #[serde(default = "default_mag_branch")]
+    branch: String,
+    #[serde(default = "default_mag_path")]
+    path: String,
+}
+
+impl Default for RawMags {
+    fn default() -> Self {
+        RawMags {
+            repo: default_mag_repo(),
+            branch: default_mag_branch(),
+            path: default_mag_path(),
+        }
+    }
+}
+
+fn default_mag_repo() -> String {
+    "Shroudmoa/ava".into()
+}
+
+fn default_mag_branch() -> String {
+    "main".into()
+}
+
+fn default_mag_path() -> String {
+    "examples".into()
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -170,6 +223,37 @@ impl Config {
         config.interface.dashboard = raw.interface.dashboard;
         config.history.enabled = raw.history.enabled;
         config.shell = raw.shell.name;
+        // mags values end up in download URLs - keep them strictly sane
+        let defaults = Mags::default();
+        config.mags = Mags {
+            repo: if crate::mag::valid_repo(&raw.mags.repo) {
+                raw.mags.repo
+            } else {
+                eprintln!(
+                    "ava: invalid [mags] repo '{}' - using {}",
+                    raw.mags.repo, defaults.repo
+                );
+                defaults.repo
+            },
+            branch: if crate::mag::safe_segment(&raw.mags.branch) {
+                raw.mags.branch
+            } else {
+                eprintln!(
+                    "ava: invalid [mags] branch '{}' - using {}",
+                    raw.mags.branch, defaults.branch
+                );
+                defaults.branch
+            },
+            path: if raw.mags.path.is_empty() || crate::mag::safe_segment(&raw.mags.path) {
+                raw.mags.path
+            } else {
+                eprintln!(
+                    "ava: invalid [mags] path '{}' - using {}",
+                    raw.mags.path, defaults.path
+                );
+                defaults.path
+            },
+        };
         config
     }
 
@@ -233,6 +317,7 @@ mod tests {
             shell: RawShell {
                 name: Some("fish".into()),
             },
+            mags: RawMags::default(),
         };
         let c = Config::from_raw(raw, Path::new("/tmp/ava/config.toml"));
         assert!(!c.interface.color);
@@ -256,5 +341,45 @@ mod tests {
         let c = Config::from_raw(RawConfig::default(), Path::new("/tmp/ava/config.toml"));
         assert!(c.sheets.directories.is_empty());
         assert!(c.sheets.files.is_empty());
+    }
+
+    #[test]
+    fn mags_default_to_the_ava_repo() {
+        let c = Config::from_raw(RawConfig::default(), Path::new("/tmp/ava/config.toml"));
+        assert_eq!(c.mags.repo, "Shroudmoa/ava");
+        assert_eq!(c.mags.branch, "main");
+        assert_eq!(c.mags.path, "examples");
+    }
+
+    #[test]
+    fn mags_can_be_overridden() {
+        let raw = RawConfig {
+            mags: RawMags {
+                repo: "myorg/mymags".into(),
+                branch: "stable".into(),
+                path: "sheets".into(),
+            },
+            ..RawConfig::default()
+        };
+        let c = Config::from_raw(raw, Path::new("/tmp/ava/config.toml"));
+        assert_eq!(c.mags.repo, "myorg/mymags");
+        assert_eq!(c.mags.branch, "stable");
+        assert_eq!(c.mags.path, "sheets");
+    }
+
+    #[test]
+    fn invalid_mags_values_fall_back_to_defaults() {
+        let raw = RawConfig {
+            mags: RawMags {
+                repo: "not-a-repo".into(),
+                branch: "../evil".into(),
+                path: "../etc".into(),
+            },
+            ..RawConfig::default()
+        };
+        let c = Config::from_raw(raw, Path::new("/tmp/ava/config.toml"));
+        assert_eq!(c.mags.repo, "Shroudmoa/ava");
+        assert_eq!(c.mags.branch, "main");
+        assert_eq!(c.mags.path, "examples");
     }
 }

@@ -68,7 +68,7 @@ pub fn banner() {
     println!();
     for (i, line) in art.iter().enumerate() {
         print!("{}{}", color::seq(DIM), line);
-        let pad = 17 - line.chars().count();
+        let pad = 17usize.saturating_sub(line.chars().count());
         print!("{}", " ".repeat(pad));
         if i < info.len() {
             println!("{}{}", color::seq(info_colors[i]), info[i]);
@@ -77,11 +77,14 @@ pub fn banner() {
         }
     }
     println!(
-        "{}type {}999{} for commands · {}d{} dashboard · {}e{} exit{}\n",
+        "{}visionmaxx{} · type {}999{} for commands · {}d{} dashboard · {}mag{} mags · {}e{} exit{}\n",
+        color::seq(DARKRED),
         color::seq(DIM),
         color::seq(CYAN),
         color::seq(DIM),
         color::seq(MAGENTA),
+        color::seq(DIM),
+        color::seq(GREEN),
         color::seq(DIM),
         color::seq(MAGENTA),
         color::seq(DIM),

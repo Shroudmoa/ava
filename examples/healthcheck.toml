@@ -1,0 +1,32 @@
+# ava example mag: healthcheck — script-style config
+# the run key is a whole shell script (TOML multi-line string), not a one-liner.
+# install: ava mag get healthcheck
+
+[[cmd]]
+name = "health"
+desc = "Health report: disk, RAM, load, failed services"
+kind = "shell"
+run = '''
+echo "== disk =="
+df -h / | tail -1
+echo
+echo "== memory =="
+free -h | awk '/^Mem/ {print $3 " used / " $2 " total"}'
+echo
+echo "== load =="
+uptime
+echo
+echo "== failed services =="
+systemctl --failed --no-legend 2>/dev/null || echo "(no systemd here)"
+'''
+
+[[cmd]]
+name = "top5"
+desc = "Top 5 processes by RAM"
+kind = "shell"
+run = '''
+for p in /proc/[0-9]*; do
+  rss=$(awk '/^VmRSS/{print $2}' "$p/status" 2>/dev/null)
+  [ -n "$rss" ] && echo "$rss $(cat "$p/comm" 2>/dev/null)"
+done | sort -rn | head -5 | awk '{printf "%8.1f MB  %s", $1/1024, $2; print ""}'
+'''

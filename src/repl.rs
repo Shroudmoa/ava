@@ -196,5 +196,9 @@ pub fn run(sheet: &Sheet, config: &AvaConfig) -> i32 {
 
 fn log_exit() {
     cmds::log("EXIT");
-    println!("{}bye.{}", color::seq(crate::cmds::DIM), color::seq(crate::cmds::RESET));
+    println!(
+        "{}bye. · visionmaxx{}",
+        color::seq(crate::cmds::DIM),
+        color::seq(crate::cmds::RESET)
+    );
 }

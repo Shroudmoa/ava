@@ -43,6 +43,12 @@ desc = "Exit ava"
 kind = "builtin"
 run = "exit"
 
+[[cmd]]
+name = "mag"
+desc = "Command mags from GitHub (list / get / update / rm)"
+kind = "builtin"
+run = "mag"
+
 # --- shell examples (edit freely) ---
 
 [[cmd]]

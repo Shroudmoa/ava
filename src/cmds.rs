@@ -26,6 +26,7 @@ pub fn builtin(key: &str) -> Option<Builtin> {
         "help" => help_cmd,
         "clear" => clear_cmd,
         "exit" => exit_cmd,
+        "mag" => mag_cmd,
         _ => return None,
     })
 }
@@ -71,25 +72,11 @@ pub fn dispatch(line: &str, sheet: &Sheet, config: &Config, announce_fallback: b
 }
 
 pub fn run_shell(cmd: &str) -> Outcome {
-    let (code, stdout, stderr) = run_shell_with(&shell_default(), cmd);
-    print!("{}", stdout);
-    if !stderr.is_empty() {
-        print!("{}", stderr);
-    }
-    let _ = std::io::stdout().flush();
-    Outcome::Done(code)
-}
-
-/// run a shell line with the given shell (`sh`, `bash`, `fish, ...`) and capture
-/// stdout+stderr, so callers (the dash's little terminal) can show what ran
-pub fn run_shell_with(shell: &str, cmd: &str) -> (i32, String, String) {
+    // inherit stdio: interactive programs (ssh, vim, top, ...) work, output
+    // streams live instead of buffering, and stderr stays on stderr
     let flag = if cfg!(windows) { "/C" } else { "-c" };
-    match Command::new(shell).arg(flag).arg(cmd).output() {
-        Ok(out) => (
-            out.status.code().unwrap_or(1),
-            String::from_utf8_lossy(&out.stdout).to_string(),
-            String::from_utf8_lossy(&out.stderr).to_string(),
-        ),
+    match Command::new(shell_default()).arg(flag).arg(cmd).status() {
+        Ok(s) => Outcome::Done(s.code().unwrap_or(1)),
         Err(e) => {
             eprintln!(
                 "{}shell error: {}{}",
@@ -97,7 +84,7 @@ pub fn run_shell_with(shell: &str, cmd: &str) -> (i32, String, String) {
                 e,
                 color::seq(RESET)
             );
-            (1, String::new(), String::new())
+            Outcome::Done(1)
         }
     }
 }
@@ -221,7 +208,7 @@ fn net_cmd(_arg: &str, _sheet: &Sheet, _config: &Config) -> Outcome {
         );
     }
     println!();
-    Outcome::Done(0)
+    Outcome::Done(if ok { 0 } else { 1 })
 }
 
 fn ports_cmd(_arg: &str, _sheet: &Sheet, _config: &Config) -> Outcome {
@@ -233,7 +220,11 @@ fn ports_cmd(_arg: &str, _sheet: &Sheet, _config: &Config) -> Outcome {
         "LOCAL",
         color::seq(RESET)
     );
-    for (port, local) in ports_list() {
+    let rows = ports_list();
+    if rows.is_empty() {
+        println!("{}(no listening ports){}", color::seq(DIM), color::seq(RESET));
+    }
+    for (port, local) in rows {
         println!("{:<8}{:<42}", port, local);
     }
     println!("{}end{}", color::seq(DIM), color::seq(RESET));
@@ -258,6 +249,10 @@ fn clear_cmd(_arg: &str, _sheet: &Sheet, _config: &Config) -> Outcome {
 
 fn exit_cmd(_arg: &str, _sheet: &Sheet, _config: &Config) -> Outcome {
     Outcome::Exit(0)
+}
+
+fn mag_cmd(arg: &str, _sheet: &Sheet, config: &Config) -> Outcome {
+    crate::mag::run(arg, config)
 }
 
 // ---------------- shared helpers ----------------

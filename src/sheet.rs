@@ -209,7 +209,12 @@ fn toml_files(dir: &Path) -> Option<Vec<PathBuf>> {
     let files: Vec<PathBuf> = rd
         .flatten()
         .map(|e| e.path())
-        .filter(|p| p.is_file() && p.extension().map(|e| e == "toml").unwrap_or(false))
+        .filter(|p| {
+            p.is_file()
+                && p.extension().map(|e| e == "toml").unwrap_or(false)
+                // mags.toml is the mag catalog index, not a command sheet
+                && p.file_name().map(|n| n != "mags.toml").unwrap_or(true)
+        })
         .collect();
     if files.is_empty() {
         return None;

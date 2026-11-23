@@ -1,0 +1,56 @@
+# mag index — `ava mag list` reads this file from the repo.
+# one [[mag]] entry per published sheet; file must be a bare *.toml name
+# sitting next to this index. keep names plain: a-z 0-9 - _
+#
+# publish your own: fork the repo, drop sheets + entries here, then point
+# ava at it:  [mags] repo = "you/your-mags"  in ~/.config/ava/config.toml
+
+[[mag]]
+name = "linux"
+file = "linux.toml"
+desc = "Server basics: disk, updates, reboot"
+
+[[mag]]
+name = "network"
+file = "network.toml"
+desc = "Diagnostics: ping, traceroute, dns, speedtest"
+
+[[mag]]
+name = "docker"
+file = "docker.toml"
+desc = "Containers, images, logs, compose"
+
+[[mag]]
+name = "virtualization"
+file = "virtualization.toml"
+desc = "libvirt / VM basics"
+
+[[mag]]
+name = "sysadmin"
+file = "sysadmin.toml"
+desc = "systemd + cron operational checks"
+
+[[mag]]
+name = "tmux"
+file = "tmux.toml"
+desc = "Persistent sessions in the dashboard terminal"
+
+[[mag]]
+name = "homelab"
+file = "homelab.toml"
+desc = "ssh targets and personal infrastructure"
+
+[[mag]]
+name = "healthcheck"
+file = "healthcheck.toml"
+desc = "Script-style: full health report"
+
+[[mag]]
+name = "backup"
+file = "backup.toml"
+desc = "Script-style: tar backup with rotation"
+
+[[mag]]
+name = "cleanup"
+file = "cleanup.toml"
+desc = "Script-style: journal, cache, tmp cleanup"

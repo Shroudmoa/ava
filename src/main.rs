@@ -1,4 +1,4 @@
-// ava v0.3 - the mova concept for linux (and windows), written in rust
+// ava v0.4 - the mova concept for linux (and windows), written in rust
 // short names, long reach. add commands in ~/.ava/sheet.toml - no rebuild needed.
 
 mod banner;
@@ -6,6 +6,7 @@ mod cmds;
 mod color;
 mod config;
 mod dash;
+mod mag;
 mod repl;
 mod sheet;
 
@@ -32,7 +33,7 @@ fn main() {
             banner::help(&sheet);
         }
         "--version" | "-V" => {
-            println!("ava {}", env!("CARGO_PKG_VERSION"));
+            println!("ava {} · visionmaxx", env!("CARGO_PKG_VERSION"));
         }
         _ => {
             // rebuild a shell-safe line: joining raw args would eat quoting

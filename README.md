@@ -12,7 +12,7 @@ $ ava
   /          \    Load   : 0.50 0.42 0.20
  /  \____/\  \    RAM    : 1.5/3.8 GB |||....... 38%
 
-type 999 for commands · d dashboard · e exit
+visionmaxx · type 999 for commands · d dashboard · mag mags · e exit
 
 ava::ti-gw@root ~/ViS › _
 ```
@@ -37,10 +37,12 @@ ava::ti-gw@root ~/ViS › _
 | `ports` | listening TCP sockets from `/proc/net/tcp{,6}` with decoded IPv4/IPv6 addresses (windows: `netstat -ano`) |
 | `d` | live status dashboard (ratatui: header + command list + terminal, refreshing) |
 | `999` | command overview |
+| `mag` | command mags from GitHub — `list`, `get <name>`, `update`, `rm <name>` |
 | `c` | clear screen |
 | `e` | exit |
 
-anything unknown is passed to your real shell, like mova does:
+anything unknown is passed to your real shell, like mova does — with a real
+terminal attached, so interactive programs (`ssh`, `vim`, `top`, ...) work:
 
 ```console
 ava::ti-gw@root ~ › ls -la | head -3
@@ -72,6 +74,50 @@ run  = "echo sudo reboot"
 that's it. new names appear in `999`, in tab-completion and in the dashboard
 immediately. entries with the same name **shadow** the built-in ones
 (override `0` if you want your own sysinfo).
+
+## mags — command configs from GitHub
+
+a **mag** is a command sheet published in a GitHub repo. `mag` pulls them
+straight into your sheets dir — no browser, no copy-paste:
+
+```console
+$ ava mag list              # the repo's catalog (+ marks installed ones)
+$ ava mag get healthcheck   # download, validate, install
+$ ava mag update            # re-fetch every installed mag
+$ ava mag rm healthcheck    # remove one
+```
+
+the default repo is [`Shroudmoa/ava`](https://github.com/Shroudmoa/ava), path
+`examples/`, branch `main`. the repo keeps an index — `mags.toml` — next to the
+sheets:
+
+```toml
+[[mag]]
+name = "healthcheck"
+file = "healthcheck.toml"
+desc = "Script-style: full health report"
+```
+
+point ava at your own repo (or a fork) in `config.toml`:
+
+```toml
+[mags]
+repo   = "you/your-mags"   # owner/repo
+branch = "main"
+path   = "examples"        # dir holding mags.toml + the sheets ("" = repo root)
+```
+
+production guards: downloads are https-only via `curl`, every mag is parsed as
+a valid sheet **before** it is installed, writes are atomic (tmp + rename), and
+index names/paths are validated against traversal. installed mags load on the
+next ava start. and remember: mags run shell commands with your permissions —
+only install from repos you trust.
+
+no ava on the box yet? `examples/install.sh` bootstraps mags with plain curl:
+
+```bash
+./install.sh linux network healthcheck
+```
 
 ## one-shot mode
 
@@ -160,6 +206,11 @@ enabled = true
 
 [shell]
 name = "bash"      # shell for the dashboard terminal: sh | bash | fish | zsh
+
+[mags]
+repo   = "Shroudmoa/ava"   # GitHub repo `mag` pulls from
+branch = "main"
+path   = "examples"        # dir holding mags.toml + the sheets
 ```
 
 - `[sheets] directories` — directories scanned for `*.toml` command sheets
@@ -183,6 +234,9 @@ name = "bash"      # shell for the dashboard terminal: sh | bash | fish | zsh
   wrapper and not ava's own dispatch. builtins (sysinfo, ports, dash, ...) are
   ava's own and always run as ava. ava's ordinary unknown-command fallback shell
   is separate and unchanged.
+- `[mags] repo / branch / path` — where `mag` downloads command configs from
+  (default `Shroudmoa/ava`, `main`, `examples`). invalid values fall back to the
+  defaults with a warning. see [mags](#mags--command-configs-from-github).
 
 a missing or invalid `config.toml` never breaks ava: defaults are used and a
 warning is printed (including when the file exists but cannot be read). the
@@ -210,13 +264,18 @@ see [`examples/`](examples/):
 ```
 examples/
 ├── README.md
+├── mags.toml           # the mag index `ava mag list` reads
+├── install.sh          # curl bootstrap: install mags without ava
 ├── linux.toml
 ├── network.toml
 ├── docker.toml
 ├── virtualization.toml
 ├── sysadmin.toml
 ├── tmux.toml
-└── homelab.toml
+├── homelab.toml
+├── healthcheck.toml    # script-style: whole scripts in one run key
+├── backup.toml         # script-style: tar backup with rotation
+└── cleanup.toml        # script-style: journal / cache / tmp cleanup
 ```
 
 copy the ones you need:
@@ -224,6 +283,27 @@ copy the ones you need:
 ```bash
 cp examples/linux.toml ~/.config/ava/sheets/
 cp examples/docker.toml ~/.config/ava/sheets/
+```
+
+or let `mag` do it: `ava mag get linux docker`.
+
+**script-style mags** (`healthcheck`, `backup`, `cleanup`) show the other shape
+of a command config: the `run` key is a whole shell script in a TOML multi-line
+string, not a one-liner —
+
+```toml
+[[cmd]]
+name = "backup"
+desc = "Backup /etc, keep the last 5"
+kind = "shell"
+run = '''
+set -eu
+dir="${BACKUP_DIR:-$HOME/backups}"
+mkdir -p "$dir"
+stamp="$(date +%Y%m%d-%H%M%S)"
+tar -czf "$dir/backup-$stamp.tar.gz" /etc 2>/dev/null || true
+ls -1t "$dir"/backup-*.tar.gz | tail -n +6 | while read -r old; do rm -- "$old"; done
+'''
 ```
 
 ## distribution
@@ -262,7 +342,11 @@ there.
 - TOML shell commands run with the permissions of the current user - that is the
   whole point of the design, there is no sandbox to escape.
 - never run sheets from people you don't trust: they execute shell commands.
-- no automatic remote execution, no automatic updates.
+  same goes for mags — `mag` only downloads from the repo you configured, over
+  https, and validates every sheet before installing it, but the commands inside
+  still run as you.
+- no automatic remote execution, no automatic updates. `mag` only ever fetches
+  when you ask it to.
 - logs and history mask secrets before writing: `TOKEN=...`, `PASSWORD=...`,
   `--token value`, `Bearer value` and `Authorization: Bearer value`. single-dash
   flags (`-psecret`) are left alone so normal commands stay readable.
@@ -293,6 +377,7 @@ ava/
     ├── config.rs         # platform config dir, defaults, optional config.toml
     ├── sheet.rs          # load + merge builtin and user sheets
     ├── cmds.rs           # builtins + dispatch + logging
+    ├── mag.rs            # mag: fetch command configs from GitHub
     ├── color.rs          # global color switch from config
     ├── repl.rs           # rustyline: history, completion, hints
     ├── dash.rs           # ratatui live dashboard

@@ -1,0 +1,26 @@
+# ava example mag: backup — script-style config
+# tar backup with rotation. override the target: BACKUP_DIR=/mnt/bak ava backup
+# install: ava mag get backup
+
+[[cmd]]
+name = "backup"
+desc = "Backup /etc (add your paths), keep the last 5"
+kind = "shell"
+run = '''
+set -eu
+dir="${BACKUP_DIR:-$HOME/backups}"
+mkdir -p "$dir"
+stamp="$(date +%Y%m%d-%H%M%S)"
+out="$dir/backup-$stamp.tar.gz"
+# plain tar flags only: works on GNU, busybox and BSD alike
+tar -czf "$out" /etc 2>/dev/null || true
+[ -s "$out" ] || { echo "backup failed: $out" >&2; exit 1; }
+ls -1t "$dir"/backup-*.tar.gz | tail -n +6 | while read -r old; do rm -- "$old"; done
+echo "saved $out"
+'''
+
+[[cmd]]
+name = "backups"
+desc = "List stored backups"
+kind = "shell"
+run = 'ls -lh "${BACKUP_DIR:-$HOME/backups}"'
